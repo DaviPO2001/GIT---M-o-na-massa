@@ -1,0 +1,9 @@
+---
+- name: Upgrade de todos os pacotes do S.O
+  apt:
+    update_cache: yes
+    upgrade: dist
+- name: instalação do git cliente
+  apt:
+    name: git
+    state: latest
