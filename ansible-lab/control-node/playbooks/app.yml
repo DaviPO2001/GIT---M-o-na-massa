@@ -1,0 +1,93 @@
+---
+- name: Configurar Servidor de aplicação Java
+  hosts: app01
+  user: vagrant
+  become: yes
+
+  vars:
+    dbhost: "db01"
+    dbname: "notes"
+    dbusername: "notesapp"
+    dbpassword: "011495"
+
+  tasks:
+
+    - name: Adicionar usuario de app
+      become: yes
+      user:
+        name: app
+        comment: Usuario de aplicação
+
+    - name: Atualizar cache de pacotes
+      become: yes
+      apt:
+        update_cache: yes
+
+    - name: Instalar dependências da aplicação
+      become: yes
+      apt:
+        name:
+          - git
+          - maven
+          - openjdk-17-jdk
+        state: present
+
+    - name: Criar diretório da aplicação
+      become: yes
+      file:
+        path: /opt/notes
+        state: directory
+        owner: app
+        group: app
+
+    - name: Marcar diretório como seguro para o git
+      become: yes
+      command: git config --system --add safe.directory /opt/notes
+
+    - name: Clone do repositório Notes
+      become: yes
+      git:
+        repo: https://github.com/callicoder/spring-boot-mysql-rest-api-tutorial.git
+        dest: /opt/notes
+        force: yes
+
+    - name: Ajustar permissões do diretório
+      become: yes
+      file:
+        path: /opt/notes
+        owner: app
+        group: app
+        recurse: yes
+
+    - name: Configurar application.properties
+      become: yes
+      template:
+        src: application.properties
+        dest: /opt/notes/src/main/resources/application.properties
+
+    - name: Build da aplicação
+      become: yes
+      command: sudo -u app mvn package
+      args:
+        chdir: /opt/notes
+        creates: /opt/notes/target
+
+    - name: Configurar serviço systemd
+      become: yes
+      template:
+        src: notes.service
+        dest: /etc/systemd/system/notes.service
+      notify: reload daemon
+
+    - name: Iniciar serviço notes
+      become: yes
+      systemd:
+        name: notes
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: reload daemon
+      become: yes
+      systemd:
+        daemon_reload: yes
